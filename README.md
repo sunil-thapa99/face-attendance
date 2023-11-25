@@ -1,6 +1,7 @@
 ### Deep Learning Assignment
 
 - Face Attendance System using Facenet
+- Create a datasets folder 
 - pip install -r requirements.txt
 - python main.py
 
