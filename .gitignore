@@ -2,3 +2,7 @@ datasets/*
 *.mp3
 __pycache__/*
 .DS_Store
+data.txt
+train.txt
+processing_record.txt
+frames_record.txt

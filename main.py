@@ -387,17 +387,17 @@ def recognize():
                 if best_class_probabilities >= 0.75:
 
                     name = result_names
-                    id = int(best_class)
+                    id = best_class
                     now = datetime.datetime.now()
                     checkin_time = now.strftime("%H:%M:%S")
 
                     mytime = checkin_time.split(':',-1)
                     mytime = int(mytime[0])
                     if mytime < 15:
-                        name = 'Hello ' + name
+                        name = name
                     else:
                         name = 'Bye ' + name
-                    classpath = 'datasets/recognized_data/{}'.format(str(id))
+                    classpath = 'datasets/recognized_data/{}'.format(id)
                     checkin_date = datetime.date.today().strftime("%B:%d:%Y")
                     if not os.path.exists(classpath):
                         os.mkdir(classpath)
