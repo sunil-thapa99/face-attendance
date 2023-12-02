@@ -25,7 +25,9 @@ class VideoCaptureApp:
         self.record_duration = 5
         self.out = cv2.VideoWriter(self.output_file, fourcc, fps, resolution)
 
-        self.video_writer_queue = multiprocessing.Queue()
+        # Loading label
+        self.loading_label = tk.Label(
+            self.root, text="Video Processing...", font=("Helvetica", 12), fg="blue")
 
         # Variables
         # Open default camera (change to 1, 2, etc., for additional cameras)
@@ -75,6 +77,18 @@ class VideoCaptureApp:
             self.root, text="Submit Video", command=self.submit_video)
         self.submit_video_button.pack(padx=10)
         self.submit_video_button.pack_forget()
+
+        # Train Video button
+        self.train_video_button = tk.Button(
+            self.root, text="Register to the system", command=self.train_image)
+        self.train_video_button.pack(padx=10)
+        self.train_video_button.pack_forget()
+
+        # Training Loading label
+        self.training_loading_label = tk.Label(
+            self.root, text="Registering with the system...", font=("Helvetica", 12), fg="blue")
+        self.training_loading_label.pack(pady=10)
+        self.training_loading_label.pack_forget()
 
     def start_registration(self):
 
@@ -141,6 +155,7 @@ class VideoCaptureApp:
     def submit_video(self):
         # Release video capture object
         self.capture.release()
+        self.out.release()
 
         self.start_recording_button.pack_forget()
         self.start_registration_button.pack_forget()
@@ -148,12 +163,16 @@ class VideoCaptureApp:
         # Perform actions to submit the recorded video (add your logic here)
         # For example, you can save the video_frames list to a file or send it to a server.
         # Reset the video_frames list for the next registration if needed.
-        # Send the video file along with student name and ID to the API
-        url = ' http://10.51.227.85:6006/upload'
-        student_name = self.student_name_var
-        student_id = self.student_id_var
+        # Send the video file along with student name and ID to the API\
+
+        # url = ' http://10.51.227.85:6006/upload'
+        url = 'http://10.51.227.94:6006/upload'
+        student_name = self.student_name_var.get()
+        student_id = self.student_id_var.get()
         print("student name:", student_name)
         print("student id:", student_id)
+
+        self.loading_label.pack(pady=10)
 
         # Reopen the video file for sending
         with open('output_video.mp4', 'rb') as file:
@@ -162,28 +181,26 @@ class VideoCaptureApp:
 
             response = requests.post(url, files=files, data=data)
 
-        # files = {'file': open(self.output_file, 'rb')}
-        # files = {'file': ('output_video.mp4', open('output_video.mp4', 'rb'))}
-
-        # data = {'name': self.student_name_var, 'id': self.student_id_var}
-
-        # response = requests.post(url, files=files, data=data)
-
-        # try:
-        #     response = requests.post(url, files=files, data=data)
-        # except:
-        #     messagebox.showinfo("Error!! ", response.text())
-        #     self.submit_video()
-
         if response.status_code == 200:
             messagebox.showinfo("Video Submitted",
                                 "Video submitted successfully!")
+            response1 = requests.get('http://10.51.227.94:6006/dataprocess')
+            messagebox.showinfo("Video Submitted",
+                                "Video processed successfully!")
+            self.loading_label.pack_forget()
+            self.train_video_button.pack()
+
         else:
             self.submit_video()
 
         # # Check the API response
         # print(response.status_code, response.text)
         # messagebox.showinfo("Video Submitted", "Video submitted successfully!")
+    def train_image(self):
+        self.training_loading_label.pack()
+        response1 = requests.post('http://10.51.227.94:6006/train')
+        messagebox.showinfo(
+            "Model Trained", "Student Registered successfully!")
         self.root.destroy()
 
 
