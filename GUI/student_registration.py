@@ -6,6 +6,7 @@ import requests
 from PIL import Image, ImageTk
 import multiprocessing
 from queue import Empty
+import requests
 
 
 class VideoCaptureApp:
@@ -17,12 +18,12 @@ class VideoCaptureApp:
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         self.root.geometry(f"{screen_width}x{screen_height}")
-        output_file = "output_video.mp4"
+        self.output_file = "output_video.mp4"
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         fps = 30  # Frames per second
         resolution = (640, 480)  # Resolution of the video
         self.record_duration = 5
-        self.out = cv2.VideoWriter(output_file, fourcc, fps, resolution)
+        self.out = cv2.VideoWriter(self.output_file, fourcc, fps, resolution)
 
         self.video_writer_queue = multiprocessing.Queue()
 
@@ -138,12 +139,51 @@ class VideoCaptureApp:
         self.root.destroy()
 
     def submit_video(self):
+        # Release video capture object
+        self.capture.release()
+
         self.start_recording_button.pack_forget()
         self.start_registration_button.pack_forget()
+        cv2.waitKey(5)
         # Perform actions to submit the recorded video (add your logic here)
         # For example, you can save the video_frames list to a file or send it to a server.
         # Reset the video_frames list for the next registration if needed.
-        messagebox.showinfo("Video Submitted", "Video submitted successfully!")
+        # Send the video file along with student name and ID to the API
+        url = ' http://10.51.227.85:6006/upload'
+        student_name = self.student_name_var
+        student_id = self.student_id_var
+        print("student name:", student_name)
+        print("student id:", student_id)
+
+        # Reopen the video file for sending
+        with open('output_video.mp4', 'rb') as file:
+            files = {'file': ('output_video.mp4', file)}
+            data = {'name': student_name, 'id': student_id}
+
+            response = requests.post(url, files=files, data=data)
+
+        # files = {'file': open(self.output_file, 'rb')}
+        # files = {'file': ('output_video.mp4', open('output_video.mp4', 'rb'))}
+
+        # data = {'name': self.student_name_var, 'id': self.student_id_var}
+
+        # response = requests.post(url, files=files, data=data)
+
+        # try:
+        #     response = requests.post(url, files=files, data=data)
+        # except:
+        #     messagebox.showinfo("Error!! ", response.text())
+        #     self.submit_video()
+
+        if response.status_code == 200:
+            messagebox.showinfo("Video Submitted",
+                                "Video submitted successfully!")
+        else:
+            self.submit_video()
+
+        # # Check the API response
+        # print(response.status_code, response.text)
+        # messagebox.showinfo("Video Submitted", "Video submitted successfully!")
         self.root.destroy()
 
 
