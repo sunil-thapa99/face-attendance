@@ -21,9 +21,10 @@ def get_students():
     return jsonify(result)
 
 
-@app.route('/students/<int:student_roll_number>', methods=['GET'])
-def get_student(student_roll_number):
-    student = Student.query.get_or_404(student_roll_number)
+@app.route('/students/getattendance', methods=['GET'])
+def get_student():
+    data = request.get_json()
+    student = Student.query.get_or_404(data['roll_number'])
     result = {'name': student.name,
               'roll_number': student.roll_number, 'attendance': student.attendance}
     return jsonify(result)
@@ -43,15 +44,16 @@ def add_student():
     return jsonify({'message': 'Student added successfully'}), 201
 
 
-@app.route('/students/<int:student_roll_number>', methods=['PUT'])
-def update_attendance(student_roll_number):
-    student = Student.query.get_or_404(student_roll_number)
+@app.route('/students/attend', methods=['POST'])
+def update_attendance():
+
     data = request.get_json()
+    student = Student.query.get_or_404(data['roll_number'])
 
     if 'attendance' not in data:
         return jsonify({'error': 'Attendance is required'}), 400
 
-    student.attendance = data['attendance']
+    student.attendance += data['attendance']
     db.session.commit()
 
     return jsonify({'message': 'Attendance updated successfully'})
