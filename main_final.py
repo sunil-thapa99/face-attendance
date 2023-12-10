@@ -7,13 +7,8 @@ from random import randint
 from flask import Flask, request, render_template, send_from_directory, jsonify
 
 
-# import tensorflow as tf
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
-
+import tensorflow as tf
 from scipy import misc
-from skimage.transform import resize
-import imageio
 import cv2
 import numpy as np
 import facenet
@@ -33,10 +28,38 @@ from extractframes import *
 from frames import *
 from data_processing import *
 
-
+#flask app started
 app = Flask(__name__)
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+cascPath = "haarcascade_frontalface_default.xml"
+
+# Create the haar cascade
+faceCascade = cv2.CascadeClassifier(cascPath)
+
+# class ImportGraph():
+#     """  Importing and running isolated TF graph """
+#     def __init__(self, loc):
+#         # Create local graph and use it in the session
+#         self.graph = tf.Graph()
+#         self.sess = tf.Session(graph=self.graph)
+#         with self.graph.as_default():
+#             # Import saved model from location 'loc' into local graph
+#             saver = tf.train.import_meta_graph(loc + '.meta',
+#                                                clear_devices=True)
+#             saver.restore(self.sess, loc)
+#             self.x = self.graph.get_tensor_by_name("Placeholder:0")
+#             self.hold_prob1 = self.graph.get_tensor_by_name("Placeholder_2:0")
+#             self.hold_prob2 = self.graph.get_tensor_by_name("Placeholder_3:0")
+#             self.y_pred = self.graph.get_tensor_by_name("add_7:0")
+
+
+#     def run(self, data):
+#         """ Running the activation operation previously imported """
+#         return self.sess.run([tf.nn.softmax(self.y_pred)], feed_dict={self.x: data, self.hold_prob1: 1, self.hold_prob2: 1})
+
+# model_1 = ImportGraph(os.getcwd() + '/models/liveness detection/model.ckpt')
 
 @app.route("/")
 def index():
@@ -56,10 +79,10 @@ def upload():
     a.write_json()
     vid_dir = os.getcwd() + '/datasets/videos/' + str(id)
     video_dir = os.path.expanduser(vid_dir)
-    
     # raw_dir = os.getcwd() + '/datasets/raw/' + str(id)
     if not os.path.exists(video_dir) and a.make_dir:
-        os.mkdir(video_dir) 
+        os.mkdir(video_dir)
+
 
     else:
         print("Couldn't create upload directory: {}".format(video_dir))
@@ -68,8 +91,6 @@ def upload():
     for upload in request.files.getlist("file"):
         print("{} is the file name".format(upload.filename))
         filename = upload.filename
-        if '/' or '\\' in filename:
-            filename = os.path.basename(filename) 
         destination = "/".join([video_dir, filename])
         upload.save(destination)
     print("Destination: ", destination)
@@ -78,7 +99,7 @@ def upload():
 
 
 #Preprocess new Faces
-@app.route("/dataprocess", methods=["POST", "GET"])
+@app.route("/dataprocess", methods=["POST"])
 def dataprocess():
     video_dir = os.getcwd() + '/datasets/videos/'
     file_name = 'frames_record.txt'
@@ -126,7 +147,7 @@ def dataprocess():
             print(image_path)
             if not os.path.exists(output_filename):
                 try:
-                    img = imageio.imread(image_path)
+                    img = misc.imread(image_path)
                     print('read data dimension: ', img.ndim)
                 except (IOError, ValueError, IndexError) as e:
                     errorMessage = '{}: {}'.format(image_path, e)
@@ -167,14 +188,12 @@ def dataprocess():
                         try:
                             cropped_temp = img[bb_temp[1]:bb_temp[3], bb_temp[0]:bb_temp[2], :]
                             # print("Cropped Image: ", cropped_temp)
-                            # scaled_temp = misc.imresize(cropped_temp, (image_size, image_size), interp='bilinear')
-                            scaled_temp = resize(cropped_temp, (image_size, image_size), mode='reflect', anti_aliasing=True)
-                            scaled_temp = (scaled_temp * 255).astype(np.uint8)
+                            scaled_temp = misc.imresize(cropped_temp, (image_size, image_size), interp='bilinear')
                         except:
                             pass
 
                         nrof_successfully_aligned += 1
-                        imageio.imwrite(output_filename, scaled_temp)
+                        misc.imsave(output_filename, scaled_temp)
                     else:
                         print('Unable to align "%s"' % image_path)
 
@@ -244,11 +263,11 @@ def train():
 
             with open(classifier_filename_exp, 'wb') as outfile:
                 pickle.dump((model, class_names), outfile)
-                # joblib.dump((model, class_names), self.classifier_filename_exp)
             print('Saved classifier model to file "%s"' % classifier_filename_exp)
             print('Goodluck')
 
     return jsonify(status="Trained")
+
 
 class LoadModel():
     """  Importing and running isolated TF graph """
@@ -259,6 +278,7 @@ class LoadModel():
         with self.graph.as_default():
             self.gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6)
             self.sess = tf.Session(config=tf.ConfigProto(gpu_options=self.gpu_options, log_device_placement=False))
+            # self.sess = tf.Session(config=tf.ConfigProto())
 
             with self.sess.as_default():
                 self.pnet, self.rnet, self.onet = detect_face.create_mtcnn(self.sess, os.getcwd() + '/align')
@@ -292,9 +312,9 @@ class LoadModel():
         feed_dict = {self.images_placeholder: data, self.phase_train_placeholder: False}
         emb_array[0, :] = self.sess.run(self.embeddings, feed_dict=feed_dict)
         predictions = self.model.predict_proba(emb_array)
-        print(emb_array)
 
         return(predictions)
+
 
 
 model = LoadModel()
@@ -311,6 +331,7 @@ with open('train.txt') as json_file:
     HumanNames = json.load(json_file)
 
 l = list(HumanNames)
+# print(l)
 l.sort()
 
 # Crop Padding
@@ -323,27 +344,87 @@ bottom = 1
 #Recognize
 @app.route("/recognize", methods=["GET","POST"])
 def recognize():
+
     for upload in request.files.getlist("file"):
 
         img_array = np.array(bytearray(upload.read()), dtype=np.uint8)
         frame = cv2.imdecode(img_array, -1)
 
+        # print("Frame shape: ", frame.shape)
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Detect faces in the image
+        faces = faceCascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(2, 2),
+            flags=cv2.CASCADE_SCALE_IMAGE
+        )
+
+        print("Found {0} faces!".format(len(faces)))
+
+        # # Crop Padding
+        # left = 1
+        # right = 1
+        # top = 1
+        # bottom = 1
+
         nameList = []
-        if frame.ndim == 2:
-            frame = facenet.to_rgb(frame)
+        if len(faces) > 0:
+            # Draw a rectangle around the faces
+            for (p, y, w, h) in faces:
+                print(p, y, w, h)
 
-        frame = frame[:, :, 0:3]
-        bounding_boxes, _ = detect_face.detect_face(frame, minsize, pnet, rnet, onet, threshold, factor)
-        nrof_faces = bounding_boxes.shape[0]
-        print('Face Detected: %d' % nrof_faces)
+                # Dubugging boxes
+                # cv2.rectangle(frame, (p, y), (p + w, p + h), (0, 255, 0), 2)
 
-        if nrof_faces > 0:
+            img = frame[y - top:y + h + bottom, p - left:p + w + right]
+            # print("Img: ", img.shape)
+
+            if img.shape[2] == 4:
+                #convert the image from RGBA2RGB
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+            # img_data = cv2.resize(img, (227, 227))
+            # img = np.reshape(img_data, [-1, 227, 227, 3])
+            # img = np.array(img)
+
+            #For Liveness Detection
+            # k = model_1.run(img)
+            # a = k[0]
+            # b = a[0]
+            #
+            # detection = np.round(k[0], 3).argmax()
+
+            # print('Start Recognition!')
+
+            if frame.ndim == 2:
+                frame = facenet.to_rgb(frame)
+
+            frame = frame[:, :, 0:3]
+            bounding_boxes, _ = detect_face.detect_face(frame, minsize, pnet, rnet, onet, threshold, factor)
+            nrof_faces = bounding_boxes.shape[0]
+            print('Face Detected: %d' % nrof_faces)
+
+            if nrof_faces == 0:
+                name = "Unknown"
+                id = None
+                checkin_time = None
+                accuracy = None
+                response = {"id": id, "name": name, "time": checkin_time, "accuracy":accuracy}
+                nameList.append(response)
+
+            # nameList = []
+        # if nrof_faces > 0:
             det = bounding_boxes[:, 0:4]
 
             cropped = []
             scaled = []
             scaled_reshape = []
             bb = np.zeros((nrof_faces, 4), dtype=np.int32)
+
 
             for i in range(nrof_faces):
                 emb_array = np.zeros((1, embedding_size))
@@ -355,74 +436,82 @@ def recognize():
 
                 # inner exception
                 if bb[i][0] <= 0 or bb[i][1] <= 0 or bb[i][2] >= len(frame[0]) or bb[i][3] >= len(frame):
+                    # print('face is too close')
                     continue
 
                 cropped.append(frame[bb[i][1]:bb[i][3], bb[i][0]:bb[i][2], :])
                 cropped[i] = facenet.flip(cropped[i], False)
-                # print(cropped)
-                # scaled.append(misc.imresize(cropped[i], (image_size, image_size), interp='bilinear'))
-                temp_img = resize(cropped[i], (image_size, image_size), mode='reflect', anti_aliasing=True)
-                scaled.append((temp_img * 255).astype(np.uint8))
+                scaled.append(misc.imresize(cropped[i], (image_size, image_size), interp='bilinear'))
                 scaled[i] = cv2.resize(scaled[i], (input_image_size, input_image_size),
                                        interpolation=cv2.INTER_CUBIC)
                 scaled[i] = facenet.prewhiten(scaled[i])
                 scaled_reshape.append(scaled[i].reshape(-1, input_image_size, input_image_size, 3))
 
-                #Call function inside the loaded model
+                #*********
                 predictions = model.predict(scaled_reshape[i], emb_array)
 
+                # print("Predictions: ",predictions)
                 best_class_indices = np.argmax(predictions, axis=1)
-                best_class_probabilities = predictions[np.arange(len(best_class_indices)), best_class_indices]
                 # print(best_class_indices)
+                best_class_probabilities = predictions[np.arange(len(best_class_indices)), best_class_indices]
 
+                # if detection == 0:
+                # l = list(HumanNames)
+                # # print(l)
+                # l.sort()
+                # print("sorted list: ", l)
+                # print("Best Class: ", best_class_indices)
                 try:
                     best_class = l[best_class_indices[0]]
+                    # second_best = l[best_class_indices[1]]
+                    # print("Best class: ", best_class)
                 except:
                     print(best_class_indices[0])
+
                 result_names = HumanNames[best_class]
-
-                print("ID: ", best_class, result_names)
+                # second_name = HumanNames[second_best]
+                # print("Result name: ", result_names)
+                print("ID: ", best_class)
                 print(best_class_probabilities)
-
-                if best_class_probabilities >= 0.75:
-
+                if best_class_probabilities >= 0.65:
+                    # print(result_names)
+                    # print(best_class_probabilities)
+                    # print("Second: ", second_name)
                     name = result_names
-                    id = best_class
+                    id = int(best_class)
+                    # attendance_register(id)
                     now = datetime.datetime.now()
                     checkin_time = now.strftime("%H:%M:%S")
-
-                    mytime = checkin_time.split(':',-1)
-                    mytime = int(mytime[0])
-                    if mytime < 15:
-                        name = name
-                    else:
-                        name = 'Bye ' + name
-                    classpath = 'datasets/recognized_data/{}'.format(id)
-                    checkin_date = datetime.date.today().strftime("%B:%d:%Y")
-                    if not os.path.exists(classpath):
-                        os.mkdir(classpath)
-                    cv2.imwrite(('{}/{}_{}_{}.jpg'.format(classpath,result_names, str(checkin_time), checkin_date)), frame)
                     accuracy = str(best_class_probabilities)
-                    response = {"id":id,"name":name, "time":checkin_time, "accuracy":accuracy}
-                    nameList.append(response)
-
                 else:
-                    # name = "Unknown"
-                    # id = None
-                    # checkin_time = None
-                    # accuracy = None
-                    now = datetime.datetime.now()
-                    checkin_time = now.strftime("%H:%M:%S")
-                    checkin_date = datetime.date.today().strftime("%B:%d:%Y")
-                    classpath = 'datasets/non_recognized/'
-                    cv2.imwrite(('{}/{}_{}.jpg'.format(classpath, str(checkin_time), checkin_date)), frame)
+                    name = "Unknown"
+                    id = None
+                    checkin_time = None
+                    accuracy = None
+
+
+                # if detection == 1:
+                #
+                #     name = "INTRUDER"
+                #     id = None
+                #     checkin_time = None
+                response = {"id":id,"name":name, "time":checkin_time, "accuracy":accuracy}
+                nameList.append(response)
 
 
         else:
-            return None
-
+            # print('Unable to align')
+            name = "Unknown"
+            id = None
+            checkin_time = None
+            accuracy = None
+            response = {"id":id,"name":name, "time":checkin_time, "accuracy":accuracy}
+            nameList.append(response)
+        # cv2.waitKey()
 
     return jsonify(response=nameList)
 
+
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=6006, debug=True)
+    app.run(host='0.0.0.0', port=8012, debug=True)
