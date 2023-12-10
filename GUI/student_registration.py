@@ -53,6 +53,10 @@ class VideoCaptureApp:
         self.canvas = tk.Canvas(self.root)
         self.canvas.pack()
 
+        # Create a label to display the video frame
+        self.video_label = tk.Label(self.root)
+        self.video_label.pack(pady=10)
+
         # Start Registration button
         self.start_registration_button = tk.Button(self.root, text="Start Registration",
                                                    command=self.start_registration)
@@ -110,16 +114,25 @@ class VideoCaptureApp:
         self.video_thread = threading.Thread(target=self.capture_video_thread)
         self.video_thread.start()
 
+        # Update the Tkinter window with the video frames
+        self.update_video()
+
     def stop_recording(self):
+        print("Inside stop recording")
         # Disable recording flag
         self.is_recording = False
 
-        # Wait for the video thread to finish
+        # # Wait for the video thread to finish
         if self.video_thread.is_alive():
             self.video_thread.join()
 
-        # Release video capture object
-        self.capture.release()
+        self.release_video()
+        self.out.release()
+
+        # self.video_thread._stop()
+        self.video_label.pack_forget()
+
+        print("after joining thread and before releasing capture")
 
         # Display recording stopped message and close the application
         messagebox.showinfo("Recording Stopped",
@@ -138,12 +151,33 @@ class VideoCaptureApp:
 
             self.out.write(frame)
 
-            # Convert the OpenCV frame to a format suitable for Tkinter
-            cv2.imshow('Video Capture', frame)
+            # # Convert the OpenCV frame to a format suitable for Tkinter
+            # cv2.imshow('Video Capture', frame)
+
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = Image.fromarray(image)
+            photo = ImageTk.PhotoImage(image=image)
+
+            # Update the label with the new image
+            self.video_label.config(image=photo)
+            self.video_label.image = photo
 
             # Press 'q' to stop the video capture
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
+    def release_video(self):
+        if hasattr(self, 'capture'):
+            self.capture.release()
+
+    def update_video(self):
+        # Check if the recording is still in progress
+        if self.is_recording and self.video_thread.is_alive():
+            # Call the update_video method after a delay (in milliseconds)
+            self.root.after(10, self.update_video())
+        else:
+            # Recording has stopped, do cleanup or any other necessary actions
+            self.capture.release()
 
     def exit_application(self):
         # Release video capture object
@@ -199,6 +233,15 @@ class VideoCaptureApp:
     def train_image(self):
         self.training_loading_label.pack()
         response1 = requests.post('http://10.51.227.94:6006/train')
+
+        # Adding to the database
+        url = 'http://127.0.0.1:5000/students'
+        student_name = self.student_name_var.get()
+        student_id = self.student_id_var.get()
+        data = {'name': student_name, 'roll_number': student_id}
+
+        response = requests.post(url=url, data=data)
+
         messagebox.showinfo(
             "Model Trained", "Student Registered successfully!")
         self.root.destroy()
