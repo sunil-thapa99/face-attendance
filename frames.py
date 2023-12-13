@@ -5,7 +5,7 @@ import json
 from extractframes import *
 
 file_name = 'frames_record.txt'
-video_dir = os.getcwd() + '/datasets/videos/'
+video_dir = os.getcwd() + '/datasets/videos'
 
 
 def frames(video_dir, file_name):
@@ -17,7 +17,7 @@ def frames(video_dir, file_name):
             json.dump({}, json_file)
             content = json.load(json_file)
         raise
-    
+
     file_list = os.listdir(video_dir)
     file_list = [file for file in file_list if file != '.DS_Store']
     for root in file_list:
@@ -27,10 +27,10 @@ def frames(video_dir, file_name):
             if str(vid_file) not in content:
                 extract_frames(video, vid_file)
 
-if __name__== "__main__":
+
+if __name__ == "__main__":
     frames(video_dir, file_name)
 
-    
     # for root, dirs, files in os.walk(video_dir):
     #     print("Root: ", root)
 
