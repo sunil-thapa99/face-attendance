@@ -23,25 +23,26 @@
 # SOFTWARE.
 
 # pylint: disable=missing-docstring
-from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import absolute_import
+from tensorflow.python.platform import gfile
+import re
+import random
+from tensorflow.python.training import training
+from scipy import interpolate
+from sklearn.model_selection import KFold
+import imageio
+from scipy import misc
+import numpy as np
+from tensorflow.python.framework import ops
+
 
 import os
 from subprocess import Popen, PIPE
 # import tensorflow as tf
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
-from tensorflow.python.framework import ops
-import numpy as np
-from scipy import misc
-import imageio
-from sklearn.model_selection import KFold
-from scipy import interpolate
-from tensorflow.python.training import training
-import random
-import re
-from tensorflow.python.platform import gfile
 
 
 def triplet_loss(anchor, positive, negative, alpha):
@@ -145,7 +146,8 @@ def read_and_augment_data(image_list, label_list, image_size, batch_size, max_nr
         if random_crop:
             image = tf.random_crop(image, [image_size, image_size, 3])
         else:
-            image = tf.image.resize_image_with_crop_or_pad(image, image_size, image_size)
+            image = tf.image.resize_image_with_crop_or_pad(
+                image, image_size, image_size)
         if random_flip:
             image = tf.image.random_flip_left_right(image)
         # pylint: disable=no-member
@@ -198,13 +200,17 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
         if optimizer == 'ADAGRAD':
             opt = tf.train.AdagradOptimizer(learning_rate)
         elif optimizer == 'ADADELTA':
-            opt = tf.train.AdadeltaOptimizer(learning_rate, rho=0.9, epsilon=1e-6)
+            opt = tf.train.AdadeltaOptimizer(
+                learning_rate, rho=0.9, epsilon=1e-6)
         elif optimizer == 'ADAM':
-            opt = tf.train.AdamOptimizer(learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
+            opt = tf.train.AdamOptimizer(
+                learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
         elif optimizer == 'RMSPROP':
-            opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
+            opt = tf.train.RMSPropOptimizer(
+                learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
         elif optimizer == 'MOM':
-            opt = tf.train.MomentumOptimizer(learning_rate, 0.9, use_nesterov=True)
+            opt = tf.train.MomentumOptimizer(
+                learning_rate, 0.9, use_nesterov=True)
         else:
             raise ValueError('Invalid optimization algorithm')
 
@@ -249,10 +255,12 @@ def crop(image, random_crop, image_size):
         sz2 = int(image_size // 2)
         if random_crop:
             diff = sz1 - sz2
-            (h, v) = (np.random.randint(-diff, diff + 1), np.random.randint(-diff, diff + 1))
+            (h, v) = (np.random.randint(-diff, diff + 1),
+                      np.random.randint(-diff, diff + 1))
         else:
             (h, v) = (0, 0)
-        image = image[(sz1 - sz2 + v):(sz1 + sz2 + v), (sz1 - sz2 + h):(sz1 + sz2 + h), :]
+        image = image[(sz1 - sz2 + v):(sz1 + sz2 + v),
+                      (sz1 - sz2 + h):(sz1 + sz2 + h), :]
     return image
 
 
@@ -347,18 +355,33 @@ class ImageClass():
         return len(self.image_paths)
 
 
-def get_dataset(paths, has_class_directories=True):
+# def get_dataset(paths, has_class_directories=True):
+#     dataset = []
+#     for path in paths.split(':'):
+#         print("inside facenet, path:", path)
+#         path_exp = os.path.expanduser(path)
+#         classes = os.listdir(path_exp)
+#         classes.sort()
+#         nrof_classes = len(classes)
+#         for i in range(nrof_classes):
+#             class_name = classes[i]
+#             facedir = os.path.join(path_exp, class_name)
+#             image_paths = get_image_paths(facedir)
+#             dataset.append(ImageClass(class_name, image_paths))
+
+#     return dataset
+
+def get_dataset(path, has_class_directories=True):
     dataset = []
-    for path in paths.split(':'):
-        path_exp = os.path.expanduser(path)
-        classes = os.listdir(path_exp)
-        classes.sort()
-        nrof_classes = len(classes)
-        for i in range(nrof_classes):
-            class_name = classes[i]
-            facedir = os.path.join(path_exp, class_name)
-            image_paths = get_image_paths(facedir)
-            dataset.append(ImageClass(class_name, image_paths))
+
+    # Assuming all subdirectories of the given path are classes
+    classes = os.listdir(path)
+    classes.sort()
+
+    for class_name in classes:
+        class_dir = os.path.join(path, class_name)
+        image_paths = get_image_paths(class_dir)
+        dataset.append(ImageClass(class_name, image_paths))
 
     return dataset
 
@@ -414,16 +437,19 @@ def load_model(model):
         print('Checkpoint file: %s' % ckpt_file)
 
         saver = tf.train.import_meta_graph(os.path.join(model_exp, meta_file))
-        saver.restore(tf.get_default_session(), os.path.join(model_exp, ckpt_file))
+        saver.restore(tf.get_default_session(),
+                      os.path.join(model_exp, ckpt_file))
 
 
 def get_model_filenames(model_dir):
     files = os.listdir(model_dir)
     meta_files = [s for s in files if s.endswith('.meta')]
     if len(meta_files) == 0:
-        raise ValueError('No meta file found in the model directory (%s)' % model_dir)
+        raise ValueError(
+            'No meta file found in the model directory (%s)' % model_dir)
     elif len(meta_files) > 1:
-        raise ValueError('There should not be more than one meta file in the model directory (%s)' % model_dir)
+        raise ValueError(
+            'There should not be more than one meta file in the model directory (%s)' % model_dir)
     meta_file = meta_files[0]
     meta_files = [s for s in files if '.ckpt' in s]
     max_step = -1
@@ -457,7 +483,8 @@ def calculate_roc(thresholds, embeddings1, embeddings2, actual_issame, nrof_fold
         # Find the best threshold for the fold
         acc_train = np.zeros((nrof_thresholds))
         for threshold_idx, threshold in enumerate(thresholds):
-            _, _, acc_train[threshold_idx] = calculate_accuracy(threshold, dist[train_set], actual_issame[train_set])
+            _, _, acc_train[threshold_idx] = calculate_accuracy(
+                threshold, dist[train_set], actual_issame[train_set])
         best_threshold_index = np.argmax(acc_train)
         for threshold_idx, threshold in enumerate(thresholds):
             tprs[fold_idx, threshold_idx], fprs[fold_idx, threshold_idx], _ = calculate_accuracy(threshold,
@@ -476,7 +503,8 @@ def calculate_accuracy(threshold, dist, actual_issame):
     predict_issame = np.less(dist, threshold)
     tp = np.sum(np.logical_and(predict_issame, actual_issame))
     fp = np.sum(np.logical_and(predict_issame, np.logical_not(actual_issame)))
-    tn = np.sum(np.logical_and(np.logical_not(predict_issame), np.logical_not(actual_issame)))
+    tn = np.sum(np.logical_and(np.logical_not(
+        predict_issame), np.logical_not(actual_issame)))
     fn = np.sum(np.logical_and(np.logical_not(predict_issame), actual_issame))
 
     tpr = 0 if (tp + fn == 0) else float(tp) / float(tp + fn)
@@ -504,14 +532,16 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
         # Find the threshold that gives FAR = far_target
         far_train = np.zeros(nrof_thresholds)
         for threshold_idx, threshold in enumerate(thresholds):
-            _, far_train[threshold_idx] = calculate_val_far(threshold, dist[train_set], actual_issame[train_set])
+            _, far_train[threshold_idx] = calculate_val_far(
+                threshold, dist[train_set], actual_issame[train_set])
         if np.max(far_train) >= far_target:
             f = interpolate.interp1d(far_train, thresholds, kind='slinear')
             threshold = f(far_target)
         else:
             threshold = 0.0
 
-        val[fold_idx], far[fold_idx] = calculate_val_far(threshold, dist[test_set], actual_issame[test_set])
+        val[fold_idx], far[fold_idx] = calculate_val_far(
+            threshold, dist[test_set], actual_issame[test_set])
 
     val_mean = np.mean(val)
     far_mean = np.mean(far)
@@ -522,7 +552,8 @@ def calculate_val(thresholds, embeddings1, embeddings2, actual_issame, far_targe
 def calculate_val_far(threshold, dist, actual_issame):
     predict_issame = np.less(dist, threshold)
     true_accept = np.sum(np.logical_and(predict_issame, actual_issame))
-    false_accept = np.sum(np.logical_and(predict_issame, np.logical_not(actual_issame)))
+    false_accept = np.sum(np.logical_and(
+        predict_issame, np.logical_not(actual_issame)))
     n_same = np.sum(actual_issame)
     n_diff = np.sum(np.logical_not(actual_issame))
     val = float(true_accept) / float(n_same)
@@ -560,7 +591,8 @@ def put_images_on_grid(images, shape=(16, 8)):
     nrof_images = images.shape[0]
     img_size = images.shape[1]
     bw = 3
-    img = np.zeros((shape[1] * (img_size + bw) + bw, shape[0] * (img_size + bw) + bw, 3), np.float32)
+    img = np.zeros((shape[1] * (img_size + bw) + bw,
+                   shape[0] * (img_size + bw) + bw, 3), np.float32)
     for i in range(shape[1]):
         x_start = i * (img_size + bw) + bw
         for j in range(shape[0]):
@@ -568,7 +600,8 @@ def put_images_on_grid(images, shape=(16, 8)):
             if img_index >= nrof_images:
                 break
             y_start = j * (img_size + bw) + bw
-            img[x_start:x_start + img_size, y_start:y_start + img_size, :] = images[img_index, :, :, :]
+            img[x_start:x_start + img_size, y_start:y_start +
+                img_size, :] = images[img_index, :, :, :]
         if img_index >= nrof_images:
             break
     return img

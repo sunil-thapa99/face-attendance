@@ -68,24 +68,25 @@ class AttendanceApp:
             _, img_encoded = cv2.imencode('.jpg', frame)
             img_bytes = img_encoded.tobytes()
 
-            # # Send the image to the recognition API
-            # response = requests.post(self.api_url, files={'file': ('image.jpg', img_bytes)})
+            # Send the image to the recognition API
+            response = requests.post(self.api_url, files={
+                                     'file': ('image.jpg', img_bytes)})
 
-            # if response.status_code == 200:
-            #     # Process the response data only if the student has not been recognized before
-            #     recognition_data = response.json()
-            #     name = recognition_data.get('name', 'Unknown')
-            #     if name not in self.recognized_students:
-            #         self.process_recognition_data(recognition_data)
+            if response.status_code == 200:
+                # Process the response data only if the student has not been recognized before
+                recognition_data = response.json()
+                name = recognition_data.get('name', 'Unknown')
+                if name not in self.recognized_students:
+                    self.process_recognition_data(recognition_data)
 
-            # For Testing Only
-            # ------------------------------------------------------
+            # # For Testing Only
+            # # ------------------------------------------------------
 
-            name = self.recognition_data['name']
-            if name not in self.recognized_students:
-                self.process_recognition_data(self.recognition_data)
+            # name = self.recognition_data['name']
+            # if name not in self.recognized_students:
+            #     self.process_recognition_data(self.recognition_data)
 
-            # --------------------------------------------------
+            # # --------------------------------------------------
 
             # Convert the OpenCV frame to a PIL image
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -101,16 +102,16 @@ class AttendanceApp:
 
     def process_recognition_data(self, recognition_data):
         # Extract relevant information from the recognition response and update the attendance list
-        # name = recognition_data.get('name', 'Unknown')
-        # roll_number = recognition_data.get('roll_number', 'N/A')
-        # status = recognition_data.get('status', 'Unknown')
+        name = recognition_data.get('name', 'Unknown')
+        roll_number = recognition_data.get('roll_number', 'N/A')
+        status = recognition_data.get('status', 'Unknown')
 
-        # For Test only
-        # --------------------------------------------
-        name = recognition_data['name']
-        roll_number = recognition_data["id"]
-        attendance = self.get_attendance(roll_number)
-        # ----------------------------------------------
+        # # For Test only
+        # # --------------------------------------------
+        # name = recognition_data['name']
+        # roll_number = recognition_data["id"]
+        # attendance = self.get_attendance(roll_number)
+        # # ----------------------------------------------
 
         # Update the attendance list
         self.attendance_list.insert(
@@ -126,8 +127,11 @@ class AttendanceApp:
         data = {"roll_number": roll_number}
         url = self.attendance_api_url+'/getattendance'
         response = requests.get(url=url, json=data)
-        data = response.json()
-        return data['attendance']
+        if response.status_code == 200:
+            data = response.json()
+            return data['attendance']
+        else:
+            return 1
 
     def call_attendance_api(self, name, roll_number):
         # Call your attendance API with the relevant data

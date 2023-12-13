@@ -1,10 +1,5 @@
 {
-    "1234": "abhilasha rohit gaur",
-    "1256": "sunil thapa",
-    "235jj5": "klsdjfisdf",
-    "2847": "dsjakf a",
-    "4567": "samir khanal",
-    "5367": "sushil basi",
-    "97653443": "abhilasha rohit gaur",
-    "c0968554": "Samir Khanal"
+    "01234": "Sushil Basi",
+    "01235": "Sunil Thapa",
+    "968554": "Samir Khanal"
 }

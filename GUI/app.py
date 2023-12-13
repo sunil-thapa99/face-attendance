@@ -30,14 +30,23 @@ def get_student():
     return jsonify(result)
 
 
+# @app.route('/students', methods=['POST'])
+# def add_student():
+#     print(request.headers)
+#     print(request.get_json())
+#     return jsonify({'message': 'Student added successfully'}), 201
+
+
 @app.route('/students', methods=['POST'])
 def add_student():
     data = request.get_json()
+    print("data:", data)
 
     if 'name' not in data or 'roll_number' not in data:
         return jsonify({'error': 'Name and Roll Number are required'}), 400
 
-    new_student = Student(name=data['name'], roll_number=data['roll_number'])
+    new_student = Student(
+        name=data['name'], roll_number=int(data['roll_number']))
     db.session.add(new_student)
     db.session.commit()
 

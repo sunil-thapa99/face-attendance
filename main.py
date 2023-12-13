@@ -1,6 +1,27 @@
-from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from __future__ import absolute_import
+from data_processing import *
+from frames import *
+from extractframes import *
+from datapreprocess import *
+from write_file import *
+from sklearn.svm import SVC
+from scipy.ndimage import rotate
+import math
+import datetime
+import time
+import json
+import pickle
+import os
+import detect_face
+import facenet
+import numpy as np
+import cv2
+import imageio
+from skimage.transform import resize
+from scipy import misc
+
 
 from random import randint
 
@@ -11,39 +32,29 @@ from flask import Flask, request, render_template, send_from_directory, jsonify
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 
-from scipy import misc
-from skimage.transform import resize
-import imageio
-import cv2
-import numpy as np
-import facenet
-import detect_face
-import os
-import pickle
-import json
-import time
-import datetime
-import math
-from scipy.ndimage import rotate
-from sklearn.svm import SVC
 # from attendence import *
-from write_file import *
-from datapreprocess import *
-from extractframes import *
-from frames import *
-from data_processing import *
+
+# Get the directory of the current script
+script_directory = os.path.dirname(os.path.abspath(__file__))
+
+# Change the current working directory to the script's directory
+os.chdir(script_directory)
+
+# Now os.getcwd() should give the correct directory
+current_dir = os.getcwd()
 
 
 app = Flask(__name__)
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+
 @app.route("/")
 def index():
     return render_template("upload_new.html")
 
 
-#Upload new Faces
+# Upload new Faces
 @app.route("/upload", methods=["POST"])
 def upload():
 
@@ -52,24 +63,23 @@ def upload():
 
     id = request.form['id']
     #
-    a= store_id(label,id)
+    a = store_id(label, id)
     a.write_json()
     vid_dir = os.getcwd() + '/datasets/videos/' + str(id)
     video_dir = os.path.expanduser(vid_dir)
-    
+
     # raw_dir = os.getcwd() + '/datasets/raw/' + str(id)
     if not os.path.exists(video_dir) and a.make_dir:
-        os.mkdir(video_dir) 
+        os.mkdir(video_dir)
 
     else:
         print("Couldn't create upload directory: {}".format(video_dir))
-
 
     for upload in request.files.getlist("file"):
         print("{} is the file name".format(upload.filename))
         filename = upload.filename
         if '/' or '\\' in filename:
-            filename = os.path.basename(filename) 
+            filename = os.path.basename(filename)
         destination = "/".join([video_dir, filename])
         upload.save(destination)
     print("Destination: ", destination)
@@ -77,29 +87,42 @@ def upload():
     return jsonify(status="Video Uploaded")
 
 
-#Preprocess new Faces
+# Preprocess new Faces
 @app.route("/dataprocess", methods=["POST", "GET"])
 def dataprocess():
-    video_dir = os.getcwd() + '/datasets/videos/'
+    print("Inside dataprocess")
+    video_dir1 = "datasets\\videos"
+    video_dir = os.path.join(current_dir, video_dir1)
+    print("video directory:", video_dir)
     file_name = 'frames_record.txt'
 
     frames(video_dir, file_name)
 
-    #Align Data
-    output_dir_path = os.getcwd() + '/datasets/aligned'
+    # Align Data
+    output_path = 'datasets\\aligned'
+    output_dir_path = os.path.join(current_dir, output_path)
+    print("output directory pathe:", output_dir_path)
+    print("current dir after output directory:", current_dir)
     output_dir = os.path.expanduser(output_dir_path)
+    print("output dir:", output_dir)
     if not os.path.exists(output_dir):
+        print("pathe doesnot exists")
         os.makedirs(output_dir)
 
-    datadir = os.getcwd() + '/datasets/raw'
-    dataset = facenet.get_dataset(datadir)
+    datadir = 'datasets\\raw'
+
+    data_dir = os.path.join(current_dir, datadir)
+    print("data directory:", data_dir)
+    dataset = facenet.get_dataset(data_dir)
 
     print('Creating networks and loading parameters')
     with tf.Graph().as_default():
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
-        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
+        sess = tf.Session(config=tf.ConfigProto(
+            gpu_options=gpu_options, log_device_placement=False))
         with sess.as_default():
-            pnet, rnet, onet = detect_face.create_mtcnn(sess, os.getcwd() + '/align')
+            pnet, rnet, onet = detect_face.create_mtcnn(
+                sess, os.path.join(current_dir, 'align'))
 
     minsize = 75  # minimum size of face
     threshold = [0.6, 0.8, 0.92]  # three steps's threshold
@@ -109,9 +132,9 @@ def dataprocess():
 
     # Add a random key to the filename to allow alignment using multiple processes
     random_key = np.random.randint(0, high=99999)
-    bounding_boxes_filename = os.path.join(output_dir, 'bounding_boxes_%05d.txt' % random_key)
+    bounding_boxes_filename = os.path.join(
+        output_dir, 'bounding_boxes_%05d.txt' % random_key)
     print('Goodluck')
-
 
     nrof_images_total = 0
     nrof_successfully_aligned = 0
@@ -141,7 +164,8 @@ def dataprocess():
                     img = img[:, :, 0:3]
                     print('after data dimension: ', img.ndim)
 
-                    bounding_boxes, _ = detect_face.detect_face(img, minsize, pnet, rnet, onet, threshold, factor)
+                    bounding_boxes, _ = detect_face.detect_face(
+                        img, minsize, pnet, rnet, onet, threshold, factor)
                     nrof_faces = bounding_boxes.shape[0]
                     print('detected_face: %d' % nrof_faces)
                     if nrof_faces == 1:
@@ -168,7 +192,8 @@ def dataprocess():
                             cropped_temp = img[bb_temp[1]:bb_temp[3], bb_temp[0]:bb_temp[2], :]
                             # print("Cropped Image: ", cropped_temp)
                             # scaled_temp = misc.imresize(cropped_temp, (image_size, image_size), interp='bilinear')
-                            scaled_temp = resize(cropped_temp, (image_size, image_size), mode='reflect', anti_aliasing=True)
+                            scaled_temp = resize(
+                                cropped_temp, (image_size, image_size), mode='reflect', anti_aliasing=True)
                             scaled_temp = (scaled_temp * 255).astype(np.uint8)
                         except:
                             pass
@@ -179,16 +204,17 @@ def dataprocess():
                         print('Unable to align "%s"' % image_path)
 
     print('Total number of images: %d' % nrof_images_total)
-    print('Number of successfully aligned images: %d' % nrof_successfully_aligned)
+    print('Number of successfully aligned images: %d' %
+          nrof_successfully_aligned)
 
-    aligned_dir = os.getcwd() + '/datasets/aligned/'
+    aligned_dir = os.path.join(current_dir, 'datasets\\aligned')
     processed_file_record = 'processing_record.txt'
     data_processing(aligned_dir, processed_file_record)
 
     return jsonify(status=True, message='Ready for training')
 
 
-#Train Data
+# Train Data
 @app.route("/train", methods=["POST"])
 def train():
 
@@ -216,85 +242,98 @@ def train():
             batch_size = 20
             image_size = 160
             nrof_images = len(paths)
-            nrof_batches_per_epoch = int(math.ceil(1.0 * nrof_images / batch_size))
+            nrof_batches_per_epoch = int(
+                math.ceil(1.0 * nrof_images / batch_size))
             emb_array = np.zeros((nrof_images, embedding_size))
 
             for i in range(nrof_batches_per_epoch):
                 start_index = i * batch_size
                 end_index = min((i + 1) * batch_size, nrof_images)
                 paths_batch = paths[start_index:end_index]
-                images = facenet.load_data(paths_batch, False, False, image_size)
-                feed_dict = {images_placeholder: images, phase_train_placeholder: False}
-                emb_array[start_index:end_index, :] = sess.run(embeddings, feed_dict=feed_dict)
+                images = facenet.load_data(
+                    paths_batch, False, False, image_size)
+                feed_dict = {images_placeholder: images,
+                             phase_train_placeholder: False}
+                emb_array[start_index:end_index, :] = sess.run(
+                    embeddings, feed_dict=feed_dict)
 
             classifier_filename = os.getcwd() + '/models/classifier/classifier.pkl'
             classifier_filename_exp = os.path.expanduser(classifier_filename)
 
             # Train classifier
             print('Training classifier')
-            model = SVC(kernel='linear', probability=True, tol = 0.5)
+            model = SVC(kernel='linear', probability=True, tol=0.5)
             model.fit(emb_array, labels)
 
             # Create a list of class names
             class_names = [cls.name.replace('_', ' ') for cls in dataset]
-            print("iam classname",class_names)
+            print("iam classname", class_names)
             # Saving classifier model
 
-            open("train.txt", "w").writelines([l for l in open("data.txt").readlines()])
+            open("train.txt", "w").writelines(
+                [l for l in open("data.txt").readlines()])
 
             with open(classifier_filename_exp, 'wb') as outfile:
                 pickle.dump((model, class_names), outfile)
                 # joblib.dump((model, class_names), self.classifier_filename_exp)
-            print('Saved classifier model to file "%s"' % classifier_filename_exp)
+            print('Saved classifier model to file "%s"' %
+                  classifier_filename_exp)
             print('Goodluck')
 
     return jsonify(status="Trained")
 
+
 class LoadModel():
     """  Importing and running isolated TF graph """
+
     def __init__(self):
         # Create local graph and use it in the session
         self.graph = tf.Graph()
 
         with self.graph.as_default():
-            self.gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6)
-            self.sess = tf.Session(config=tf.ConfigProto(gpu_options=self.gpu_options, log_device_placement=False))
+            self.gpu_options = tf.GPUOptions(
+                per_process_gpu_memory_fraction=0.6)
+            self.sess = tf.Session(config=tf.ConfigProto(
+                gpu_options=self.gpu_options, log_device_placement=False))
 
             with self.sess.as_default():
-                self.pnet, self.rnet, self.onet = detect_face.create_mtcnn(self.sess, os.getcwd() + '/align')
+                self.pnet, self.rnet, self.onet = detect_face.create_mtcnn(
+                    self.sess, os.getcwd() + '/align')
 
                 self.modeldir = os.getcwd() + '/models/facenet/20170512-110547.pb'
                 facenet.load_model(self.modeldir)
 
                 self.images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
                 self.embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
-                self.phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
+                self.phase_train_placeholder = tf.get_default_graph(
+                ).get_tensor_by_name("phase_train:0")
                 self.embedding_size = self.embeddings.get_shape()[1]
 
                 self.classifier_filename = os.getcwd() + '/models/classifier/classifier.pkl'
-                self.classifier_filename_exp = os.path.expanduser(self.classifier_filename)
+                self.classifier_filename_exp = os.path.expanduser(
+                    self.classifier_filename)
 
                 with open(self.classifier_filename_exp, 'rb') as infile:
                     (self.model, self.class_names) = pickle.load(infile)
-                    print('load classifier file-> %s' % self.classifier_filename_exp)
-
+                    print('load classifier file-> %s' %
+                          self.classifier_filename_exp)
 
     def embedding_tensor(self):
-        return(self.embedding_size)
+        return (self.embedding_size)
 
     def nets(self):
-        return(self.pnet, self.rnet, self.onet)
-
+        return (self.pnet, self.rnet, self.onet)
 
     def predict(self, data, emb_array):
         """ Running the activation operation previously imported """
 
-        feed_dict = {self.images_placeholder: data, self.phase_train_placeholder: False}
+        feed_dict = {self.images_placeholder: data,
+                     self.phase_train_placeholder: False}
         emb_array[0, :] = self.sess.run(self.embeddings, feed_dict=feed_dict)
         predictions = self.model.predict_proba(emb_array)
         print(emb_array)
 
-        return(predictions)
+        return (predictions)
 
 
 model = LoadModel()
@@ -320,8 +359,8 @@ top = 1
 bottom = 1
 
 
-#Recognize
-@app.route("/recognize", methods=["GET","POST"])
+# Recognize
+@app.route("/recognize", methods=["GET", "POST"])
 def recognize():
     for upload in request.files.getlist("file"):
 
@@ -333,7 +372,8 @@ def recognize():
             frame = facenet.to_rgb(frame)
 
         frame = frame[:, :, 0:3]
-        bounding_boxes, _ = detect_face.detect_face(frame, minsize, pnet, rnet, onet, threshold, factor)
+        bounding_boxes, _ = detect_face.detect_face(
+            frame, minsize, pnet, rnet, onet, threshold, factor)
         nrof_faces = bounding_boxes.shape[0]
         print('Face Detected: %d' % nrof_faces)
 
@@ -361,18 +401,21 @@ def recognize():
                 cropped[i] = facenet.flip(cropped[i], False)
                 # print(cropped)
                 # scaled.append(misc.imresize(cropped[i], (image_size, image_size), interp='bilinear'))
-                temp_img = resize(cropped[i], (image_size, image_size), mode='reflect', anti_aliasing=True)
+                temp_img = resize(
+                    cropped[i], (image_size, image_size), mode='reflect', anti_aliasing=True)
                 scaled.append((temp_img * 255).astype(np.uint8))
                 scaled[i] = cv2.resize(scaled[i], (input_image_size, input_image_size),
                                        interpolation=cv2.INTER_CUBIC)
                 scaled[i] = facenet.prewhiten(scaled[i])
-                scaled_reshape.append(scaled[i].reshape(-1, input_image_size, input_image_size, 3))
+                scaled_reshape.append(
+                    scaled[i].reshape(-1, input_image_size, input_image_size, 3))
 
-                #Call function inside the loaded model
+                # Call function inside the loaded model
                 predictions = model.predict(scaled_reshape[i], emb_array)
 
                 best_class_indices = np.argmax(predictions, axis=1)
-                best_class_probabilities = predictions[np.arange(len(best_class_indices)), best_class_indices]
+                best_class_probabilities = predictions[np.arange(
+                    len(best_class_indices)), best_class_indices]
                 # print(best_class_indices)
 
                 try:
@@ -391,19 +434,20 @@ def recognize():
                     now = datetime.datetime.now()
                     checkin_time = now.strftime("%H:%M:%S")
 
-                    mytime = checkin_time.split(':',-1)
+                    mytime = checkin_time.split(':', -1)
                     mytime = int(mytime[0])
                     if mytime < 15:
                         name = name
                     else:
                         name = 'Bye ' + name
-                    classpath = 'datasets/recognized_data/{}'.format(id)
-                    checkin_date = datetime.date.today().strftime("%B:%d:%Y")
-                    if not os.path.exists(classpath):
-                        os.mkdir(classpath)
-                    cv2.imwrite(('{}/{}_{}_{}.jpg'.format(classpath,result_names, str(checkin_time), checkin_date)), frame)
+                    # # classpath = 'datasets/recognized_data/{}'.format(id)
+                    # checkin_date = datetime.date.today().strftime("%B:%d:%Y")
+                    # if not os.path.exists(classpath):
+                    #     os.mkdir(classpath)
+                    # cv2.imwrite(('{}/{}_{}_{}.jpg'.format(classpath,result_names, str(checkin_time), checkin_date)), frame)
                     accuracy = str(best_class_probabilities)
-                    response = {"id":id,"name":name, "time":checkin_time, "accuracy":accuracy}
+                    response = {"id": id, "name": name,
+                                "time": checkin_time, "accuracy": accuracy}
                     nameList.append(response)
 
                 else:
@@ -414,15 +458,14 @@ def recognize():
                     now = datetime.datetime.now()
                     checkin_time = now.strftime("%H:%M:%S")
                     checkin_date = datetime.date.today().strftime("%B:%d:%Y")
-                    classpath = 'datasets/non_recognized/'
-                    cv2.imwrite(('{}/{}_{}.jpg'.format(classpath, str(checkin_time), checkin_date)), frame)
-
+                    # classpath = 'datasets/non_recognized/'
+                    # cv2.imwrite(('{}/{}_{}.jpg'.format(classpath, str(checkin_time), checkin_date)), frame)
 
         else:
             return None
 
-
     return jsonify(response=nameList)
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=6006, debug=True)

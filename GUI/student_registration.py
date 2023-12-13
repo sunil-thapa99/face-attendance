@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 import multiprocessing
 from queue import Empty
 import requests
+import json
 
 
 class VideoCaptureApp:
@@ -53,9 +54,9 @@ class VideoCaptureApp:
         self.canvas = tk.Canvas(self.root)
         self.canvas.pack()
 
-        # Create a label to display the video frame
-        self.video_label = tk.Label(self.root)
-        self.video_label.pack(pady=10)
+        # # Create a label to display the video frame
+        # self.video_label = tk.Label(self.root)
+        # self.video_label.pack(pady=10)
 
         # Start Registration button
         self.start_registration_button = tk.Button(self.root, text="Start Registration",
@@ -129,8 +130,8 @@ class VideoCaptureApp:
         self.release_video()
         self.out.release()
 
-        # self.video_thread._stop()
-        self.video_label.pack_forget()
+        # # self.video_thread._stop()
+        # self.video_label.pack_forget()
 
         print("after joining thread and before releasing capture")
 
@@ -152,15 +153,15 @@ class VideoCaptureApp:
             self.out.write(frame)
 
             # # Convert the OpenCV frame to a format suitable for Tkinter
-            # cv2.imshow('Video Capture', frame)
+            cv2.imshow('Video Capture', frame)
 
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(image)
-            photo = ImageTk.PhotoImage(image=image)
+            # image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # image = Image.fromarray(image)
+            # photo = ImageTk.PhotoImage(image=image)
 
             # Update the label with the new image
-            self.video_label.config(image=photo)
-            self.video_label.image = photo
+            # self.video_label.config(image=photo)
+            # self.video_label.image = photo
 
             # Press 'q' to stop the video capture
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -199,8 +200,8 @@ class VideoCaptureApp:
         # Reset the video_frames list for the next registration if needed.
         # Send the video file along with student name and ID to the API\
 
-        # url = ' http://10.51.227.85:6006/upload'
-        url = 'http://10.51.227.94:6006/upload'
+        url = 'http://127.0.0.1:6006/upload'
+        # url = 'http://10.51.227.94:6006/upload'
         student_name = self.student_name_var.get()
         student_id = self.student_id_var.get()
         print("student name:", student_name)
@@ -218,7 +219,7 @@ class VideoCaptureApp:
         if response.status_code == 200:
             messagebox.showinfo("Video Submitted",
                                 "Video submitted successfully!")
-            response1 = requests.get('http://10.51.227.94:6006/dataprocess')
+            response1 = requests.get('http://127.0.0.1:6006/dataprocess')
             messagebox.showinfo("Video Submitted",
                                 "Video processed successfully!")
             self.loading_label.pack_forget()
@@ -232,15 +233,17 @@ class VideoCaptureApp:
         # messagebox.showinfo("Video Submitted", "Video submitted successfully!")
     def train_image(self):
         self.training_loading_label.pack()
-        response1 = requests.post('http://10.51.227.94:6006/train')
+        response1 = requests.post('http://127.0.0.1:6006/train')
 
         # Adding to the database
         url = 'http://127.0.0.1:5000/students'
         student_name = self.student_name_var.get()
         student_id = self.student_id_var.get()
         data = {'name': student_name, 'roll_number': student_id}
+        data = json.dumps(data)
+        headers = {"Content-Type": "application/json"}
 
-        response = requests.post(url=url, data=data)
+        response = requests.post(url=url, data=data, headers=headers)
 
         messagebox.showinfo(
             "Model Trained", "Student Registered successfully!")
