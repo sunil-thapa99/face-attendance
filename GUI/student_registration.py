@@ -172,7 +172,8 @@ class VideoCaptureApp:
 
     def update_video(self):
         # Check if the recording is still in progress
-        if self.is_recording and self.video_thread.is_alive():
+        # if self.is_recording and self.video_thread.is_alive():
+        if self.is_recording:
             # Call the update_video method after a delay (in milliseconds)
             self.root.after(10, self.update_video())
         else:
@@ -200,7 +201,8 @@ class VideoCaptureApp:
         # Send the video file along with student name and ID to the API\
 
         # url = ' http://10.51.227.85:6006/upload'
-        url = 'http://10.51.227.94:6006/upload'
+        # url = 'http://10.51.227.94:6006/upload'
+        url = 'http://127.0.0.1:6006/upload'
         student_name = self.student_name_var.get()
         student_id = self.student_id_var.get()
         print("student name:", student_name)
@@ -218,7 +220,8 @@ class VideoCaptureApp:
         if response.status_code == 200:
             messagebox.showinfo("Video Submitted",
                                 "Video submitted successfully!")
-            response1 = requests.get('http://10.51.227.94:6006/dataprocess')
+            # response1 = requests.get('http://10.51.227.94:6006/dataprocess')
+            response1 = requests.get('http://127.0.0.1:6006/dataprocess')
             messagebox.showinfo("Video Submitted",
                                 "Video processed successfully!")
             self.loading_label.pack_forget()
@@ -232,7 +235,8 @@ class VideoCaptureApp:
         # messagebox.showinfo("Video Submitted", "Video submitted successfully!")
     def train_image(self):
         self.training_loading_label.pack()
-        response1 = requests.post('http://10.51.227.94:6006/train')
+        # response1 = requests.post('http://10.51.227.94:6006/train')
+        response1 = requests.post('http://127.0.0.1:6006/train')
 
         # Adding to the database
         url = 'http://127.0.0.1:5000/students'

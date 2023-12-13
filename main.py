@@ -327,7 +327,7 @@ def recognize():
 
         img_array = np.array(bytearray(upload.read()), dtype=np.uint8)
         frame = cv2.imdecode(img_array, -1)
-
+        
         nameList = []
         if frame.ndim == 2:
             frame = facenet.to_rgb(frame)

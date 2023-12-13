@@ -24,7 +24,8 @@ class AttendanceApp:
         self.attendance_list.heading("Attendance", text="Attendance")
         self.attendance_list.pack(side=tk.RIGHT, padx=10)
 
-        self.api_url = "http://10.51.227.94:6006/recognize"
+        # self.api_url = "http://10.51.227.94:6006/recognize"
+        self.api_url = "http://127.0.0.1:6006/recognize"
         self.attendance_api_url = "http://127.0.0.1:5000/students"
 
         # Set to keep track of recognized students
@@ -69,21 +70,21 @@ class AttendanceApp:
             img_bytes = img_encoded.tobytes()
 
             # # Send the image to the recognition API
-            # response = requests.post(self.api_url, files={'file': ('image.jpg', img_bytes)})
+            response = requests.post(self.api_url, files={'file': ('image.jpg', img_bytes)})
 
-            # if response.status_code == 200:
-            #     # Process the response data only if the student has not been recognized before
-            #     recognition_data = response.json()
-            #     name = recognition_data.get('name', 'Unknown')
-            #     if name not in self.recognized_students:
-            #         self.process_recognition_data(recognition_data)
+            if response.status_code == 200:
+                # Process the response data only if the student has not been recognized before
+                recognition_data = response.json()
+                name = recognition_data.get('name', 'Unknown')
+                if name not in self.recognized_students:
+                    self.process_recognition_data(recognition_data)
 
             # For Testing Only
             # ------------------------------------------------------
 
-            name = self.recognition_data['name']
-            if name not in self.recognized_students:
-                self.process_recognition_data(self.recognition_data)
+            # name = self.recognition_data['name']
+            # if name not in self.recognized_students:
+            #     self.process_recognition_data(self.recognition_data)
 
             # --------------------------------------------------
 
