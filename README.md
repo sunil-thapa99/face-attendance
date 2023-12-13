@@ -41,3 +41,9 @@ Response: {
     'accuracy': ''
 }
 ```
+
+### WorkFlow
+Run main.py from the root folder<br/>
+Run app.py for database api from the GUI folder<br/>
+Run student_registration.py from the GUI folder for registering the students video and information<br/>
+Then, Run attendance_system.py to take attendance from the GUI folder.
